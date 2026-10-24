@@ -11,9 +11,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Run the Wii U toolchain inside Docker, but keep Actions' Node-based
-      # steps on the host. The builder image has an older libc than checkout
-      # requires, so it must not be the job-level container.
       - name: Configure and build RPX
         shell: bash
         run: |
@@ -26,8 +23,21 @@ jobs:
               set -euxo pipefail
               export DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
               export DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"
-              test -f "$DEVKITPRO/portlibs/wiiu/include/SDL2/SDL.h" || find "$DEVKITPRO" -path "*/SDL2/SDL.h" -print -quit | grep -q .
-              "$DEVKITPRO/portlibs/wiiu/bin/powerpc-eabi-cmake" -S . -B build
+              command -v powerpc-eabi-g++
+              command -v cmake
+              find "$DEVKITPRO" -maxdepth 5 \( -name "WiiU.cmake" -o -name "powerpc-eabi-cmake" \) -print || true
+              # Prefer the Wii U-specific wrapper if present; otherwise use
+              # the WUT CMake toolchain file supplied by devkitPro.
+              if command -v powerpc-eabi-cmake >/dev/null 2>&1; then
+                powerpc-eabi-cmake -S . -B build
+              elif [ -f "$DEVKITPRO/cmake/WiiU.cmake" ]; then
+                cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/WiiU.cmake"
+              elif [ -f "$DEVKITPRO/cmake/wiiu.cmake" ]; then
+                cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/wiiu.cmake"
+              else
+                echo "Could not find powerpc-eabi-cmake or Wii U CMake toolchain file" >&2
+                exit 1
+              fi
               cmake --build build --parallel
             '
 
