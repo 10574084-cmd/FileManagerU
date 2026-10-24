@@ -4,32 +4,46 @@ on:
     branches: [ main ]
   pull_request:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    # This community image is intended for Wii U builds and includes SDL2,
+    # avoiding pacman database syncs that were failing with HTTP 403.
     container:
-      image: devkitpro/devkitppc:latest
+      image: wiiuenv/devkitppc-with-sdl2:latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install SDL2 portlib
+
+      - name: Verify Wii U toolchain
         shell: bash
         run: |
           set -euxo pipefail
-          dkp-pacman -Sy --noconfirm
-          dkp-pacman -S --needed --noconfirm wiiu-sdl2
+          test -d "${DEVKITPRO:-/opt/devkitpro}/devkitPPC"
+          test -f "${DEVKITPRO:-/opt/devkitpro}/portlibs/wiiu/include/SDL2/SDL.h" || find "${DEVKITPRO:-/opt/devkitpro}" -path '*/SDL2/SDL.h' -print -quit | grep -q .
+          command -v cmake
+          command -v powerpc-eabi-g++
+
+      - name: Configure
+        shell: bash
+        run: |
+          set -euxo pipefail
+          export DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
+          export DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"
+          "${DEVKITPRO}/portlibs/wiiu/bin/powerpc-eabi-cmake" -S . -B build
+
       - name: Build RPX
         shell: bash
         run: |
           set -euxo pipefail
-          export DEVKITPRO=/opt/devkitpro
-          export DEVKITPPC=/opt/devkitpro/devkitPPC
-          /opt/devkitpro/portlibs/wiiu/bin/powerpc-eabi-cmake -S . -B build
           cmake --build build --parallel
+
       - name: Check output
         shell: bash
         run: |
           set -euxo pipefail
           find build -type f -name '*.rpx' -print -quit | grep -q .
+
       - uses: actions/upload-artifact@v4
         with:
           name: WiiU-FileManager-RPX
