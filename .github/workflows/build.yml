@@ -8,35 +8,28 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # This community image is intended for Wii U builds and includes SDL2,
-    # avoiding pacman database syncs that were failing with HTTP 403.
-    container:
-      image: wiiuenv/devkitppc-with-sdl2:latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Wii U toolchain
+      # Run the Wii U toolchain inside Docker, but keep Actions' Node-based
+      # steps on the host. The builder image has an older libc than checkout
+      # requires, so it must not be the job-level container.
+      - name: Configure and build RPX
         shell: bash
         run: |
           set -euxo pipefail
-          test -d "${DEVKITPRO:-/opt/devkitpro}/devkitPPC"
-          test -f "${DEVKITPRO:-/opt/devkitpro}/portlibs/wiiu/include/SDL2/SDL.h" || find "${DEVKITPRO:-/opt/devkitpro}" -path '*/SDL2/SDL.h' -print -quit | grep -q .
-          command -v cmake
-          command -v powerpc-eabi-g++
-
-      - name: Configure
-        shell: bash
-        run: |
-          set -euxo pipefail
-          export DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
-          export DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"
-          "${DEVKITPRO}/portlibs/wiiu/bin/powerpc-eabi-cmake" -S . -B build
-
-      - name: Build RPX
-        shell: bash
-        run: |
-          set -euxo pipefail
-          cmake --build build --parallel
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/work" \
+            -w /work \
+            wiiuenv/devkitppc-with-sdl2:latest \
+            bash -lc '
+              set -euxo pipefail
+              export DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
+              export DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"
+              test -f "$DEVKITPRO/portlibs/wiiu/include/SDL2/SDL.h" || find "$DEVKITPRO" -path "*/SDL2/SDL.h" -print -quit | grep -q .
+              "$DEVKITPRO/portlibs/wiiu/bin/powerpc-eabi-cmake" -S . -B build
+              cmake --build build --parallel
+            '
 
       - name: Check output
         shell: bash
