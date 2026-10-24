@@ -1,0 +1,43 @@
+name: Build WiiU File Manager
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkitppc:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Wii U development packages
+        shell: bash
+        run: |
+          pacman -Sy --noconfirm
+          pacman -S --needed --noconfirm wiiu-dev wiiu-sdl2
+
+      - name: Configure and build RPX
+        shell: bash
+        run: |
+          export DEVKITPRO=/opt/devkitpro
+          export DEVKITPPC=/opt/devkitpro/devkitPPC
+          cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/WiiU.cmake
+          cmake --build build --parallel
+
+      - name: Verify RPX exists
+        shell: bash
+        run: |
+          find build -type f -name '*.rpx' -print -quit | grep -q .
+          find build -type f -name '*.rpx' -exec file {} \;
+
+      - name: Upload native RPX build
+        uses: actions/upload-artifact@v4
+        with:
+          name: WiiU-FileManager-RPX
+          path: build/**/*.rpx
+          if-no-files-found: error
