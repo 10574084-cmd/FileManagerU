@@ -24,23 +24,20 @@ jobs:
               export DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
               export DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"
               export PATH="$DEVKITPPC/bin:$DEVKITPRO/tools/bin:$DEVKITPRO/bin:$PATH"
-              echo "DEVKITPRO=$DEVKITPRO"
-              echo "DEVKITPPC=$DEVKITPPC"
-              echo "PATH=$PATH"
-              ls -la "$DEVKITPRO" || true
-              find "$DEVKITPRO" -maxdepth 6 \( -name "powerpc-eabi-g++" -o -name "powerpc-eabi-cmake" -o -iname "*wiiu*.cmake" \) -print || true
               command -v powerpc-eabi-g++
               command -v cmake
-              if command -v powerpc-eabi-cmake >/dev/null 2>&1; then
-                powerpc-eabi-cmake -S . -B build
+              # Older wiiuenv images ship WUTs toolchain under wut/share.
+              if [ -f "$DEVKITPRO/wut/share/wut.toolchain.cmake" ]; then
+                TOOLCHAIN="$DEVKITPRO/wut/share/wut.toolchain.cmake"
               elif [ -f "$DEVKITPRO/cmake/WiiU.cmake" ]; then
-                cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/WiiU.cmake"
-              elif [ -f "$DEVKITPRO/cmake/wiiu.cmake" ]; then
-                cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/wiiu.cmake"
+                TOOLCHAIN="$DEVKITPRO/cmake/WiiU.cmake"
               else
-                echo "Could not find powerpc-eabi-cmake or Wii U CMake toolchain file" >&2
+                echo "No Wii U CMake toolchain found. WUT contents:" >&2
+                find "$DEVKITPRO/wut" -maxdepth 4 -type f -print 2>/dev/null || true
                 exit 1
               fi
+              echo "Using Wii U toolchain: $TOOLCHAIN"
+              cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=Release
               cmake --build build --parallel
             '
 
