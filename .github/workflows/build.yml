@@ -19,15 +19,18 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/work" \
             -w /work \
             wiiuenv/devkitppc-with-sdl2:latest \
-            bash -lc '
+            bash -c '
               set -euxo pipefail
               export DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
               export DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"
+              export PATH="$DEVKITPPC/bin:$DEVKITPRO/tools/bin:$DEVKITPRO/bin:$PATH"
+              echo "DEVKITPRO=$DEVKITPRO"
+              echo "DEVKITPPC=$DEVKITPPC"
+              echo "PATH=$PATH"
+              ls -la "$DEVKITPRO" || true
+              find "$DEVKITPRO" -maxdepth 6 \( -name "powerpc-eabi-g++" -o -name "powerpc-eabi-cmake" -o -iname "*wiiu*.cmake" \) -print || true
               command -v powerpc-eabi-g++
               command -v cmake
-              find "$DEVKITPRO" -maxdepth 5 \( -name "WiiU.cmake" -o -name "powerpc-eabi-cmake" \) -print || true
-              # Prefer the Wii U-specific wrapper if present; otherwise use
-              # the WUT CMake toolchain file supplied by devkitPro.
               if command -v powerpc-eabi-cmake >/dev/null 2>&1; then
                 powerpc-eabi-cmake -S . -B build
               elif [ -f "$DEVKITPRO/cmake/WiiU.cmake" ]; then
