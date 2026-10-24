@@ -24,21 +24,17 @@ jobs:
               export DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
               export DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"
               export PATH="$DEVKITPPC/bin:$DEVKITPRO/tools/bin:$DEVKITPRO/bin:$PATH"
+              CMAKE_WIIU="$DEVKITPRO/portlibs/wiiu/bin/powerpc-eabi-cmake"
               command -v powerpc-eabi-g++
               command -v cmake
-              # Older wiiuenv images ship WUTs toolchain under wut/share.
-              if [ -f "$DEVKITPRO/wut/share/wut.toolchain.cmake" ]; then
-                TOOLCHAIN="$DEVKITPRO/wut/share/wut.toolchain.cmake"
-              elif [ -f "$DEVKITPRO/cmake/WiiU.cmake" ]; then
-                TOOLCHAIN="$DEVKITPRO/cmake/WiiU.cmake"
-              else
-                echo "No Wii U CMake toolchain found. WUT contents:" >&2
-                find "$DEVKITPRO/wut" -maxdepth 4 -type f -print 2>/dev/null || true
+              if [ ! -x "$CMAKE_WIIU" ]; then
+                echo "Wii U CMake wrapper not found at $CMAKE_WIIU" >&2
+                find "$DEVKITPRO" -maxdepth 6 -type f -name "powerpc-eabi-cmake" -print 2>/dev/null || true
                 exit 1
               fi
-              echo "Using Wii U toolchain: $TOOLCHAIN"
-              cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN" -DCMAKE_BUILD_TYPE=Release
-              cmake --build build --parallel
+              echo "Using Wii U CMake wrapper: $CMAKE_WIIU"
+              "$CMAKE_WIIU" -S /work -B /work/build -DCMAKE_BUILD_TYPE=Release
+              cmake --build /work/build --parallel
             '
 
       - name: Check output
